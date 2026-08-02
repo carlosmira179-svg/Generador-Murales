@@ -61,7 +61,6 @@ def procesar_mural_bytes(image_bytes, user_w_cm, target_h_cm, overlap_cm=1.0, au
             
             tile_crop = img_resized.crop((px_left, px_top, px_right, px_bottom))
             
-            # Guardar el recorte en memoria sin tocar disco
             img_buffer = io.BytesIO()
             tile_crop.save(img_buffer, format='JPEG', quality=95)
             img_buffer.seek(0)
@@ -101,7 +100,7 @@ def procesar_mural_bytes(image_bytes, user_w_cm, target_h_cm, overlap_cm=1.0, au
     return bytes(pdf.output())
 
 # ==============================================================================
-# INTERFAZ WEB (STREAMLIT)
+# INTERFAZ WEB COMPATIBLE CON PANTALLAS TÁCTILES / ANDROID
 # ==============================================================================
 st.set_page_config(page_title="Generador de Murales A4", page_icon="🖼️")
 
@@ -112,21 +111,35 @@ st.sidebar.header("Parámetros del Mural")
 target_h_cm = st.sidebar.number_input("Alto del Mural (cm):", value=250.0, step=10.0)
 overlap_cm = st.sidebar.number_input("Solape (cm):", value=1.0, step=0.1)
 
-uploaded_files = st.file_uploader("Cargá una o varias imágenes (JPG, PNG, WEBP):", type=['jpg', 'jpeg', 'png', 'webp'], accept_multiple_files=True)
+# Guardar archivos cargados en la memoria persistente del navegador
+if "archivos_subidos" not in st.session_state:
+    st.session_state.archivos_subidos = []
 
-# El botón ahora SIEMPRE se muestra en pantalla
+files_input = st.file_uploader(
+    "Cargá una o varias imágenes (JPG, PNG, WEBP):", 
+    type=['jpg', 'jpeg', 'png', 'webp'], 
+    accept_multiple_files=True
+)
+
+if files_input:
+    st.session_state.archivos_subidos = files_input
+
+if st.session_state.archivos_subidos:
+    st.info(f"📁 {len(st.session_state.archivos_subidos)} imagen(es) lista(s) para procesar.")
+
 if st.button("🚀 GENERAR MURALES EN PDF", use_container_width=True):
-    if not uploaded_files:
+    if not st.session_state.archivos_subidos:
         st.warning("⚠️ Por favor, cargá al menos una imagen arriba antes de generar el PDF.")
     else:
         pdf_outputs = []
         progress_bar = st.progress(0)
         status_text = st.empty()
-        total = len(uploaded_files)
+        total = len(st.session_state.archivos_subidos)
         
-        for idx, file in enumerate(uploaded_files, 1):
+        for idx, file in enumerate(st.session_state.archivos_subidos, 1):
             status_text.text(f"Procesando imagen {idx} de {total}: {file.name}...")
-            img_bytes = file.read()
+            # Leer los bytes de la imagen
+            img_bytes = file.getvalue()
             pdf_bytes = procesar_mural_bytes(img_bytes, 0, target_h_cm, overlap_cm, auto_prop=True)
             
             filename_pdf = os.path.splitext(file.name)[0] + "_Mural.pdf"
