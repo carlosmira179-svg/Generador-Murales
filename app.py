@@ -1,5 +1,5 @@
 # ==============================================================================
-# GENERADOR AUTOMÁTICO DE MURALES EN PDF - VERSIÓN WEB ESTABLE
+# GENERADOR AUTOMÁTICO DE MURALES EN PDF - OPTIMIZADO PARA IMÁGENES PESADAS (UPSCAYL)
 # Archivo principal: app.py
 # ==============================================================================
 
@@ -7,9 +7,13 @@ import os
 import math
 import io
 import zipfile
+import gc
 import streamlit as st
 from PIL import Image
 from fpdf import FPDF
+
+# Permitir abrir imágenes gigantes sin límites de píxeles de PIL
+Image.MAX_IMAGE_PIXELS = None
 
 A4_WIDTH_CM = 21.0
 A4_HEIGHT_CM = 29.7
@@ -17,7 +21,7 @@ A4_HEIGHT_CM = 29.7
 def cm_to_mm(cm_val):
     return cm_val * 10.0
 
-def procesar_mural_bytes(image_bytes, target_h_cm, overlap_cm=1.0, dpi=300):
+def procesar_mural_bytes(image_bytes, target_h_cm, overlap_cm=1.0, dpi=150):
     img_stream = io.BytesIO(image_bytes)
     img = Image.open(img_stream)
     
@@ -37,10 +41,16 @@ def procesar_mural_bytes(image_bytes, target_h_cm, overlap_cm=1.0, dpi=300):
     if cols < 1: cols = 1
     if rows < 1: rows = 1
     
+    # Reducimos los DPI a 150 para evitar sobrecargar la memoria RAM del servidor
     target_pix_w = int((mural_w_cm / 2.54) * dpi)
     target_pix_h = int((mural_h_cm / 2.54) * dpi)
     
-    img_resized = img.resize((target_pix_w, target_pix_h), Image.Resampling.LANCZOS)
+    # Redimensionar eficiente
+    img_resized = img.resize((target_pix_w, target_pix_h), Image.Resampling.BILINEAR)
+    
+    # Liberar la imagen original de la memoria
+    del img
+    gc.collect()
     
     pdf = FPDF(orientation='P', unit='mm', format='A4')
     pdf.set_auto_page_break(auto=False)
@@ -63,7 +73,7 @@ def procesar_mural_bytes(image_bytes, target_h_cm, overlap_cm=1.0, dpi=300):
             tile_crop = img_resized.crop((px_left, px_top, px_right, px_bottom))
             
             img_buffer = io.BytesIO()
-            tile_crop.save(img_buffer, format='JPEG', quality=95)
+            tile_crop.save(img_buffer, format='JPEG', quality=85)
             img_buffer.seek(0)
             
             tile_w_mm = cm_to_mm(x_end_cm - x_start_cm)
@@ -98,6 +108,12 @@ def procesar_mural_bytes(image_bytes, target_h_cm, overlap_cm=1.0, dpi=300):
             label = f"Fila {r} - Columna {col_idx}   |   Mural: {mural_w_cm:.1f}x{mural_h_cm:.1f} cm   |   Solape: {overlap_cm} cm"
             pdf.text(cm_to_mm(0.5), cm_to_mm(A4_HEIGHT_CM) - cm_to_mm(0.4), label)
             
+            del tile_crop
+            del img_buffer
+
+    del img_resized
+    gc.collect()
+    
     return bytes(pdf.output())
 
 # ==============================================================================
