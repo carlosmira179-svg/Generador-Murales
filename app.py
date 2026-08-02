@@ -114,45 +114,47 @@ overlap_cm = st.sidebar.number_input("Solape (cm):", value=1.0, step=0.1)
 
 uploaded_files = st.file_uploader("Cargá una o varias imágenes (JPG, PNG, WEBP):", type=['jpg', 'jpeg', 'png', 'webp'], accept_multiple_files=True)
 
-if uploaded_files and st.button("🚀 GENERAR MURALES EN PDF"):
-    pdf_outputs = []
-    
-    progress_bar = st.progress(0)
-    status_text = st.empty()
-    
-    total = len(uploaded_files)
-    
-    for idx, file in enumerate(uploaded_files, 1):
-        status_text.text(f"Procesando imagen {idx} de {total}: {file.name}...")
-        img_bytes = file.read()
-        pdf_bytes = procesar_mural_bytes(img_bytes, 0, target_h_cm, overlap_cm, auto_prop=True)
-        
-        filename_pdf = os.path.splitext(file.name)[0] + "_Mural.pdf"
-        pdf_outputs.append((filename_pdf, pdf_bytes))
-        
-        progress_bar.progress(int((idx / total) * 100))
-        
-    status_text.success("¡Proceso completado con éxito!")
-    
-    if len(pdf_outputs) == 1:
-        # Descarga directa si es un solo PDF
-        st.download_button(
-            label="📄 Descargar PDF",
-            data=pdf_outputs[0][1],
-            file_name=pdf_outputs[0][0],
-            mime="application/pdf"
-        )
+# El botón ahora SIEMPRE se muestra en pantalla
+if st.button("🚀 GENERAR MURALES EN PDF", use_container_width=True):
+    if not uploaded_files:
+        st.warning("⚠️ Por favor, cargá al menos una imagen arriba antes de generar el PDF.")
     else:
-        # Descarga en un archivo ZIP si son varias imágenes
-        zip_buffer = io.BytesIO()
-        with zipfile.ZipFile(zip_buffer, "w") as zf:
-            for name, data in pdf_outputs:
-                zf.writestr(name, data)
-        zip_buffer.seek(0)
+        pdf_outputs = []
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        total = len(uploaded_files)
         
-        st.download_button(
-            label="📦 Descargar Todos en un paquete (.ZIP)",
-            data=zip_buffer,
-            file_name="Murales_Procesados.zip",
-            mime="application/zip"
-        )
+        for idx, file in enumerate(uploaded_files, 1):
+            status_text.text(f"Procesando imagen {idx} de {total}: {file.name}...")
+            img_bytes = file.read()
+            pdf_bytes = procesar_mural_bytes(img_bytes, 0, target_h_cm, overlap_cm, auto_prop=True)
+            
+            filename_pdf = os.path.splitext(file.name)[0] + "_Mural.pdf"
+            pdf_outputs.append((filename_pdf, pdf_bytes))
+            
+            progress_bar.progress(int((idx / total) * 100))
+            
+        status_text.success("¡Proceso completado con éxito!")
+        
+        if len(pdf_outputs) == 1:
+            st.download_button(
+                label="📄 Descargar PDF",
+                data=pdf_outputs[0][1],
+                file_name=pdf_outputs[0][0],
+                mime="application/pdf",
+                use_container_width=True
+            )
+        else:
+            zip_buffer = io.BytesIO()
+            with zipfile.ZipFile(zip_buffer, "w") as zf:
+                for name, data in pdf_outputs:
+                    zf.writestr(name, data)
+            zip_buffer.seek(0)
+            
+            st.download_button(
+                label="📦 Descargar Todos en un paquete (.ZIP)",
+                data=zip_buffer,
+                file_name="Murales_Procesados.zip",
+                mime="application/zip",
+                use_container_width=True
+            )
