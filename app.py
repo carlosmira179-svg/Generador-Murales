@@ -1,5 +1,5 @@
 # ==============================================================================
-# GENERADOR AUTOMÁTICO DE MURALES EN PDF - COMPATIBLE TABLET/ANDROID (FORM)
+# GENERADOR AUTOMÁTICO DE MURALES EN PDF - VERSIÓN WEB ESTABLE
 # Archivo principal: app.py
 # ==============================================================================
 
@@ -17,16 +17,17 @@ A4_HEIGHT_CM = 29.7
 def cm_to_mm(cm_val):
     return cm_val * 10.0
 
-def procesar_mural_bytes(image_bytes, user_w_cm, target_h_cm, overlap_cm=1.0, auto_prop=True, dpi=300):
-    img = Image.open(io.BytesIO(image_bytes)).convert('RGB')
+def procesar_mural_bytes(image_bytes, target_h_cm, overlap_cm=1.0, dpi=300):
+    img_stream = io.BytesIO(image_bytes)
+    img = Image.open(img_stream)
+    
+    if img.mode != 'RGB':
+        img = img.convert('RGB')
+        
     orig_px_w, orig_px_h = img.size
     
-    if auto_prop and target_h_cm > 0:
-        mural_h_cm = target_h_cm
-        mural_w_cm = (orig_px_w * target_h_cm) / orig_px_h
-    else:
-        mural_w_cm = user_w_cm
-        mural_h_cm = target_h_cm
+    mural_h_cm = target_h_cm
+    mural_w_cm = (orig_px_w * target_h_cm) / orig_px_h
 
     step_w_cm = A4_WIDTH_CM - overlap_cm
     step_h_cm = A4_HEIGHT_CM - overlap_cm
@@ -100,7 +101,7 @@ def procesar_mural_bytes(image_bytes, user_w_cm, target_h_cm, overlap_cm=1.0, au
     return bytes(pdf.output())
 
 # ==============================================================================
-# INTERFAZ WEB CON ESTRUCTURA DE FORMULARIO BLINDADA
+# INTERFAZ WEB
 # ==============================================================================
 st.set_page_config(page_title="Generador de Murales A4", page_icon="🖼️")
 
@@ -111,7 +112,6 @@ st.sidebar.header("Parámetros del Mural")
 target_h_cm = st.sidebar.number_input("Alto del Mural (cm):", value=250.0, step=10.0)
 overlap_cm = st.sidebar.number_input("Solape (cm):", value=1.0, step=0.1)
 
-# Usamos un formulario blindado para evitar problemas con Android
 with st.form("mural_form", clear_on_submit=False):
     uploaded_files = st.file_uploader(
         "Cargá una o varias imágenes (JPG, PNG, WEBP):", 
@@ -119,7 +119,6 @@ with st.form("mural_form", clear_on_submit=False):
         accept_multiple_files=True
     )
     
-    # El botón vive ADENTRO del formulario
     submit_button = st.form_submit_button("🚀 PROCESAR Y GENERAR MURALES", use_container_width=True)
 
 if submit_button:
@@ -133,8 +132,8 @@ if submit_button:
         
         for idx, file in enumerate(uploaded_files, 1):
             status_text.text(f"Procesando {idx} de {total}: {file.name}...")
-            img_bytes = file.read()
-            pdf_bytes = procesar_mural_bytes(img_bytes, 0, target_h_cm, overlap_cm, auto_prop=True)
+            raw_bytes = file.getvalue()
+            pdf_bytes = procesar_mural_bytes(raw_bytes, target_h_cm, overlap_cm)
             
             filename_pdf = os.path.splitext(file.name)[0] + "_Mural.pdf"
             pdf_outputs.append((filename_pdf, pdf_bytes))
